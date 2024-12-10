@@ -29,13 +29,25 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ query: message }),
       });
 
       // TODO: Handle the response from the chat API to display the AI response in the UI
 
+      if (!response.ok){
+        throw new Error(`Response status: ${response.status}`);
+      }
 
+      const result = await response.json();
 
+      console.log(result);
+
+      const llm_message = result.response as string;
+
+      const llm_response = { role: "ai" as const, content: llm_message};
+
+      setMessages(prev => [...prev, llm_response]);
+      setMessage("");
 
     } catch (error) {
       console.error("Error:", error);
