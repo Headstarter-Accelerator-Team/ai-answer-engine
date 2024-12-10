@@ -1,6 +1,9 @@
-"use client";
 
+"use client";
+import { LampContainer } from "@/components/ui/lamp";
 import { useState } from "react";
+import { motion } from "framer-motion";
+import { PlaceholdersAndVanishInput } from "@/components/ui/placeholders-and-vanish-input";
 
 type Message = {
   role: "user" | "ai";
@@ -42,7 +45,9 @@ export default function Home() {
 
       console.log(result);
 
-      const llm_message = result.response as string;
+      const llm_message = typeof result.response === "string" 
+      ? result.response 
+      : JSON.stringify(result.response);
 
       const llm_response = { role: "ai" as const, content: llm_message};
 
@@ -51,6 +56,11 @@ export default function Home() {
 
     } catch (error) {
       console.error("Error:", error);
+      setMessages(prev => [
+        ...prev,
+        { role: "ai", content: "Something went wrong. Please try again." },
+      ]);
+
     } finally {
       setIsLoading(false);
     }
@@ -67,7 +77,6 @@ export default function Home() {
           <h1 className="text-xl font-semibold text-white">Chat</h1>
         </div>
       </div>
-
       {/* Messages Container */}
       <div className="flex-1 overflow-y-auto pb-32 pt-4">
         <div className="max-w-3xl mx-auto px-4">
@@ -118,21 +127,29 @@ export default function Home() {
       <div className="fixed bottom-0 w-full bg-gray-800 border-t border-gray-700 p-4">
         <div className="max-w-3xl mx-auto">
           <div className="flex gap-3 items-center">
-            <input
+            {/* <input
               type="text"
               value={message}
               onChange={e => setMessage(e.target.value)}
               onKeyPress={e => e.key === "Enter" && handleSend()}
               placeholder="Type your message..."
               className="flex-1 rounded-xl border border-gray-700 bg-gray-900 px-4 py-3 text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent placeholder-gray-400"
+            /> */}
+            <PlaceholdersAndVanishInput 
+              placeholders={['Type your message...']}
+              onChange={e => setMessage(e.target.value)}
+              onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
+                e.preventDefault();
+                handleSend();
+              }}
             />
-            <button
+            {/* <button
               onClick={handleSend}
               disabled={isLoading}
               className="bg-cyan-600 text-white px-5 py-3 rounded-xl hover:bg-cyan-700 transition-all disabled:bg-cyan-800 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? "Sending..." : "Send"}
-            </button>
+            </button> */}
           </div>
         </div>
       </div>
