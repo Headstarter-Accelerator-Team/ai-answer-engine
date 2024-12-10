@@ -38,6 +38,7 @@ export async function POST(req: Request) {
     return NextResponse.json({response: result});
 
   } catch (error) {
-    return NextResponse.json({response: error});
+    console.error("Failed to get response from groq. Error: ", error);
+    return NextResponse.error();
   }
 }

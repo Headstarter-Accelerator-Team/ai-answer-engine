@@ -42,7 +42,9 @@ export default function Home() {
 
       console.log(result);
 
-      const llm_message = result.response as string;
+      const llm_message = typeof result.response === "string"
+      ? result.response
+      : JSON.stringify(result.response);
 
       const llm_response = { role: "ai" as const, content: llm_message};
 
@@ -51,6 +53,10 @@ export default function Home() {
 
     } catch (error) {
       console.error("Error:", error);
+      setMessages(prev => [
+        ...prev,
+        { role: "ai", content: "Something went wrong. Please try again."},
+      ]);
     } finally {
       setIsLoading(false);
     }
