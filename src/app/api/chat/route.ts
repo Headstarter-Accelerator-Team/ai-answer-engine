@@ -16,17 +16,12 @@ export async function POST(req: Request) {
     
     // Retrieve user query from request body
     const data = await req.json();
-    const query = data.query || "";
-    console.log("Data: ", query);
+    const conversation = data.conversation || [];
+    console.log("Conversation: ", conversation);
 
     const response = await client.chat.completions.create({
-      messages: [
-        {
-          role: "user",
-          content: query,
-        },
-      ],
       model: "llama3-8b-8192",
+      messages: conversation,
     });
 
     console.log("Response done.")

@@ -6,14 +6,14 @@ import { motion } from "framer-motion";
 import { PlaceholdersAndVanishInput } from "@/components/ui/placeholders-and-vanish-input";
 
 type Message = {
-  role: "user" | "ai";
+  role: "user" | "system";
   content: string;
 };
 
 export default function Home() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "ai", content: "Hello! How can I help you today?" },
+    { role: "system", content: "Hello! How can I help you today?" },
   ]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -22,17 +22,23 @@ export default function Home() {
 
     // Add user message to the conversation
     const userMessage = { role: "user" as const, content: message };
+    
+    const conversationHistory = [
+      ...messages,
+      userMessage
+    ];
+    
     setMessages(prev => [...prev, userMessage]);
     setMessage("");
     setIsLoading(true);
-
+    
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ query: message }),
+        body: JSON.stringify({ conversation: conversationHistory }),
       });
 
       // TODO: Handle the response from the chat API to display the AI response in the UI
@@ -49,7 +55,7 @@ export default function Home() {
       ? result.response 
       : JSON.stringify(result.response);
 
-      const llm_response = { role: "ai" as const, content: llm_message};
+      const llm_response = { role: "system" as const, content: llm_message};
 
       setMessages(prev => [...prev, llm_response]);
       setMessage("");
@@ -58,7 +64,7 @@ export default function Home() {
       console.error("Error:", error);
       setMessages(prev => [
         ...prev,
-        { role: "ai", content: "Something went wrong. Please try again." },
+        { role: "system", content: "Something went wrong. Please try again." },
       ]);
 
     } finally {
@@ -84,14 +90,14 @@ export default function Home() {
             <div
               key={index}
               className={`flex gap-4 mb-4 ${
-                msg.role === "ai"
+                msg.role === "system"
                   ? "justify-start"
                   : "justify-end flex-row-reverse"
               }`}
             >
               <div
                 className={`px-4 py-2 rounded-2xl max-w-[80%] ${
-                  msg.role === "ai"
+                  msg.role === "system"
                     ? "bg-gray-800 border border-gray-700 text-gray-100"
                     : "bg-cyan-600 text-white ml-auto"
                 }`}
