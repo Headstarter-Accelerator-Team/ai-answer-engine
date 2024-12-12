@@ -10,6 +10,18 @@ type Message = {
   content: string;
 };
 
+
+function extractUrls(input: string): string[] {
+    // Regular expression to match URLs
+    const urlRegex = /https?:\/\/(?:www\.)?[a-zA-Z0-9._-]+\.[a-zA-Z]{2,}(?:\/[a-zA-Z0-9._-]*)*/g;
+
+    // Use the match method to find all URLs in the string
+    const matches = input.match(urlRegex);
+
+    // Return the matches or an empty array if no URLs were found
+    return matches || [];
+}
+
 export default function Home() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([
@@ -17,8 +29,40 @@ export default function Home() {
   ]);
   const [isLoading, setIsLoading] = useState(false);
 
+  const extract_URL_Content = async (urls: string[]) => {
+    try {
+      const response = await fetch('/api/scrape', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ URLs: urls}),
+      })
+      if (!response.ok) {
+        console.error("Error");
+        return [];
+      }
+
+      const result = response.json();
+      console.log("Result: ", result);
+
+    } catch (error) {
+      console.error("Error: ", error);
+      return [];
+    }
+  };
+
   const handleSend = async () => {
     if (!message.trim()) return;
+
+
+    const urls = extractUrls(message);
+
+    console.log(urls);
+
+    const url_data = (urls.length > 0) ? await extract_URL_Content(urls) : [];
+
+    console.log("URL Data: ", url_data);
 
     // Add user message to the conversation
     const userMessage = { role: "user" as const, content: message };
