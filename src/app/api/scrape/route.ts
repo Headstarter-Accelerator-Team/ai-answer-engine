@@ -37,11 +37,29 @@ export async function POST(req: Response) {
                 console.log("Visiting ", currUrl);
 
                 // Extract page content
-                const html = await page.content();
+                // const html = await page.content();
+
+                // Extract content
+                const structuredContent = await page.evaluate(() => {
+                    const getText = (selector: string) => Array.from(document.querySelectorAll(selector)).map(el => (el as HTMLElement).innerText.trim());
+
+                    return {
+                        title: document.title || document.querySelector("h1")?.innerText || "No title",
+                        headings: Array.from(document.querySelectorAll("h1, h2, h3")).map(heading => ({
+                            heading: (heading as HTMLElement).innerText.trim(),
+                            tag: heading.tagName.toLowerCase()
+                        })),
+                        paragraphs: getText("p"),
+                        // links: Array.from(document.querySelectorAll("a")).map(link => ({
+                        //     text: link.innerText.trim(),
+                        //     url: link.href
+                        // }))
+                    };
+                });
 
                 urlContent.push({
                     url: currUrl,
-                    content: html,
+                    content: structuredContent,
                 });
             } catch (error) {
                 console.error(`Failed to scrape ${currUrl}:`, error);
@@ -56,7 +74,7 @@ export async function POST(req: Response) {
             }
         }
 
-        console.log("URL Content: ", urlContent);
+        console.log("URL Content: ", JSON.stringify(urlContent));
 
         return NextResponse.json({ content: urlContent });
     } catch (error) {

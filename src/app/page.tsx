@@ -13,7 +13,8 @@ type Message = {
 
 function extractUrls(input: string): string[] {
     // Regular expression to match URLs
-    const urlRegex = /https?:\/\/(?:www\.)?[a-zA-Z0-9._-]+\.[a-zA-Z]{2,}(?:\/[a-zA-Z0-9._-]*)*/g;
+    // const urlRegex = /https?:\/\/(?:www\.)?[a-zA-Z0-9._-]+\.[a-zA-Z]{2,}(?:\/[a-zA-Z0-9._-]*)*/g;
+    const urlRegex = /https?:\/\/[^\s/$.?#].[^\s]*/g;
 
     // Use the match method to find all URLs in the string
     const matches = input.match(urlRegex);
@@ -43,9 +44,11 @@ export default function Home() {
         return [];
       }
 
-      const result = response.json();
+      const result = await response.json();
       console.log("Result: ", result);
 
+      console.log("Structured Data: ", result.content);
+      return result.content;
     } catch (error) {
       console.error("Error: ", error);
       return [];
@@ -71,12 +74,17 @@ export default function Home() {
     setIsLoading(true);
 
     try {
+
+      const combinedContent = {
+        userMessage: message,
+        urlContent: url_data,
+      }
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ query: message }),
+        body: JSON.stringify({ query: combinedContent }),
       });
 
       // TODO: Handle the response from the chat API to display the AI response in the UI

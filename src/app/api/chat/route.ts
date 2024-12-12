@@ -16,17 +16,19 @@ export async function POST(req: Request) {
     
     // Retrieve user query from request body
     const data = await req.json();
-    const query = data.query || "";
-    console.log("Data: ", query);
+    const { userMessage, urlContent } = data.query;
+
+    console.log("User message: ", userMessage);
+    console.log("URL content: ", urlContent);
 
     const response = await client.chat.completions.create({
       messages: [
         {
           role: "user",
-          content: query,
+          content: `User message: ${userMessage}\nURL content: ${JSON.stringify(urlContent)}`,
         },
       ],
-      model: "llama3-8b-8192",
+      model: "llama-3.1-8b-instant",
     });
 
     console.log("Response done.")
