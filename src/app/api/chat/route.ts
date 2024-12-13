@@ -4,6 +4,8 @@
 // Refer to the Cheerio docs here on how to parse HTML: https://cheerio.js.org/docs/basics/loading
 // Refer to Puppeteer docs here: https://pptr.dev/guides/what-is-puppeteer
 
+//JSON format {query: "exampple of user query, best biotracking wearables"}
+
 import { NextRequest, NextResponse } from "next/server";
 import dotenv from "dotenv";
 import Groq from "groq-sdk";
@@ -41,7 +43,7 @@ async function getGoogleSearchResults(query: string): Promise<SearchResult[]> {
     );
   }
   const limitedItems = data.items.slice(0, 2);
-  console.log("12423", limitedItems);
+  //console.log("12423", limitedItems);
   return limitedItems.map((item: SearchResult) => ({
     title: item.title,
     link: item.link,
@@ -80,7 +82,7 @@ export async function POST(req: NextRequest) {
     `;
 
     const llmResponse = await openai.chat.completions.create({
-      model: "llama-3.1-8b-instant",
+      model: "llama3-8b-8192",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: query },
@@ -88,11 +90,9 @@ export async function POST(req: NextRequest) {
     });
 
     const llmAnswer = llmResponse.choices[0]?.message?.content || "No response";
-    // console.log(query, scrapedHTMLPages, llmAnswer);
+    console.log(llmAnswer);
     return NextResponse.json({
-      query,
-      extractedData,
-      llmResponse: llmAnswer,
+      llmAnswer,
     });
   } catch (error: unknown) {
     console.error("Error querying the LLM:", (error as Error).message);
@@ -151,8 +151,15 @@ async function parseTopResultsWithCheerio(searchResults: SearchResult[]) {
       const allParagraphs = $("p")
         .map((i, elem) => $(elem).text())
         .get();
-      //console.log("scraped data: ", title);
-      return `${title}\n${allParagraphs}`;
+
+      // Combine paragraphs and limit by word count
+      const combinedContent = [title, ...allParagraphs].join(" ");
+      const limitedContent = combinedContent
+        .split(/\s+/)
+        .slice(0, 3000)
+        .join(" "); // Limit to 100 words
+      console.log("scraped data: ", title);
+      return `${title}\n${limitedContent}`;
     })
   );
 
