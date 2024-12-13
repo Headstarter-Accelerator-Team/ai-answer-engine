@@ -72,10 +72,6 @@ export default function Home() {
     setIsLoading(true);
 
     try {
-      const combinedContent = {
-        userMessage: message,
-        urlContent: urls,
-      };
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
@@ -87,15 +83,6 @@ export default function Home() {
       // TODO: Handle the response from the chat API to display the AI response in the UI
 
       if (!response.ok) {
-        if (response.status === 429) {
-          setMessages(prev => [
-            ...prev,
-            {
-              role: "ai",
-              content: "Request limit exceeded, try again in 10 seconds",
-            },
-          ]);
-        }
         throw new Error(`Response status: ${response.status}`);
       }
 
@@ -115,7 +102,15 @@ export default function Home() {
       setMessage("");
     } catch (error) {
       console.error("Error:", error);
-      if (response.status != 429) {
+      if (error instanceof Error && error.message.includes("429")) {
+        setMessages(prev => [
+          ...prev,
+          {
+            role: "ai",
+            content: "Request limit exceeded, try again in 10 seconds",
+          },
+        ]);
+      } else {
         setMessages(prev => [
           ...prev,
           { role: "ai", content: "Something went wrong. Please try again." },

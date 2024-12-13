@@ -9,7 +9,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import dotenv from "dotenv";
 import Groq from "groq-sdk";
-import puppeteer from "puppeteer";
 import * as cheerio from "cheerio";
 import axios from "axios";
 
@@ -127,40 +126,6 @@ async function getGoogleSearchResults(query: string): Promise<SearchResult[]> {
     link: item.link,
     snippet: item.snippet,
   }));
-}
-
-async function scrapeTopGoogleResults(query: string): Promise<string[]> {
-  const browser = await puppeteer.launch({ headless: true });
-  const page = await browser.newPage();
-
-  // Step 1: Navigate to Google with the search query
-  const searchURL = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-  await page.goto(searchURL, { waitUntil: "networkidle2" });
-
-  // Step 2: Extract the top 2 result links
-  const links = await page.evaluate(() => {
-    return Array.from(document.querySelectorAll("a"))
-      .filter(a => a.href.includes("http"))
-      .map(a => a.href)
-      .slice(0, 2); // Limit to top 2 links
-  });
-
-  // Step 3: Visit each link and extract its HTML
-  const results: string[] = [];
-  for (const link of links) {
-    try {
-      const newPage = await browser.newPage();
-      await newPage.goto(link, { waitUntil: "networkidle2" });
-      const html = await newPage.content();
-      results.push(html);
-      await newPage.close();
-    } catch (error) {
-      console.error(`Error scraping ${link}:`, error);
-    }
-  }
-
-  await browser.close();
-  return results;
 }
 
 async function parseTopResultsWithCheerio(searchResults: SearchResult[]) {
