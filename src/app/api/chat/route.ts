@@ -19,7 +19,10 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const GOOGLE_SEARCH_ENGINE_ID = process.env.GOOGLE_SEARCH_ENGINE_ID;
 // Initialize OpenAI client
-
+interface ChatMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
 interface SearchResult {
   title: string;
   link: string;
@@ -30,6 +33,81 @@ const openai = new Groq({
   apiKey: GROQ_API_KEY!,
   baseURL: "https://api.groq.com",
 });
+
+export async function POST(req: NextRequest) {
+  try {
+    // Parse the request body
+    const body = await req.json();
+    const { query, url } = body;
+    console.log(query, url);
+    if (!query) {
+      return NextResponse.json({ error: "Query is required" }, { status: 400 });
+    }
+    let scrapedHTMLPages: SearchResult[] = [];
+    if (url.length > 0) {
+      console.log("url detect: ", url);
+      scrapedHTMLPages = url.map((u: string) => ({
+        title: "chat url",
+        link: u, // Use the current URL from the array
+        snippet: "user's url",
+      }));
+    } else {
+      // Handle the case where no URLs are provided
+      scrapedHTMLPages = await getGoogleSearchResults(query);
+    }
+    // Step 2: Parse the content of the results
+    const extractedData = await parseTopResultsWithCheerio(scrapedHTMLPages);
+
+    const allLinks = extractedData.flatMap(result => result.links);
+    const completeData = extractedData.flatMap(result => result.content);
+    const data = completeData.flatMap(result =>
+      result.split(/\s+/).slice(0, 2500).join(" ")
+    );
+    // LLM interaction
+    const systemPrompt = `
+      YOu are an academic expert where you base your responses only on the context you have been provided.
+      **Task:**
+      1. Analyze the extracted data and provide a comprehensive, informative, and concise response to the query.
+      2. Cite sources within the response using a format like: (Source 1) or (Source 2).
+      3. Avoid plagiarism and ensure the response is original and well-structured.
+
+      **Format:**
+      * **Answer:** 
+      * **Sources Cited:**
+      ${(await data).join("\n\n")}\n\n
+    `;
+    const messages: ChatMessage[] = [
+      {
+        role: "system",
+        content: systemPrompt,
+      },
+      {
+        role: "user",
+        content: query + data,
+      }, // Updated to access content
+    ];
+    console.log("message", messages);
+    const llmResponse = await openai.chat.completions.create({
+      model: "llama3-8b-8192",
+      messages: messages,
+    });
+
+    const llmAnswer = llmResponse.choices[0]?.message?.content || "No response";
+    //console.log(llmResponse);
+
+    // Return both the LLM answer and the extracted links
+    return NextResponse.json({
+      response: llmAnswer,
+      links: allLinks, // Include the links in the response
+    });
+  } catch (error: unknown) {
+    console.error("Error querying the LLM:", (error as Error).message);
+    return NextResponse.json(
+      { error: "Internal server error", details: (error as Error).message },
+      { status: 500 }
+    );
+  }
+}
 
 async function getGoogleSearchResults(query: string): Promise<SearchResult[]> {
   const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_SEARCH_ENGINE_ID}&q=${encodeURIComponent(query)}`;
@@ -49,63 +127,6 @@ async function getGoogleSearchResults(query: string): Promise<SearchResult[]> {
     link: item.link,
     snippet: item.snippet,
   }));
-}
-
-export async function POST(req: NextRequest) {
-  try {
-    // Parse the request body
-    const body = await req.json();
-    const { query } = body;
-
-    if (!query) {
-      return NextResponse.json({ error: "Query is required" }, { status: 400 });
-    }
-
-    // Step 1: Scrape the top 10 Google results
-    const scrapedHTMLPages = await getGoogleSearchResults(query);
-
-    // Step 2: Parse the content of the results
-    const extractedData = await parseTopResultsWithCheerio(scrapedHTMLPages);
-
-    const allLinks = extractedData.flatMap(result => result.links);
-    const data = extractedData.flatMap(result => result.content);
-    // LLM interaction
-    const systemPrompt = `
-      You are an expert in web content analysis. Use the following data to answer the query:
-      **Task:**
-      1. Analyze the extracted data and provide a comprehensive, informative, and concise response to the query.
-      2. Cite sources within the response using a format like: (Source 1) or (Source 2).
-      3. Avoid plagiarism and ensure the response is original and well-structured.
-
-      **Format:**
-      * **Answer:** 
-      * **Sources Cited:**
-      ${(await data).join("\n\n")}\n\n
-    `;
-
-    const llmResponse = await openai.chat.completions.create({
-      model: "llama3-8b-8192",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: query },
-      ],
-    });
-
-    const llmAnswer = llmResponse.choices[0]?.message?.content || "No response";
-    console.log(llmAnswer);
-
-    // Return both the LLM answer and the extracted links
-    return NextResponse.json({
-      response: llmAnswer,
-      links: allLinks, // Include the links in the response
-    });
-  } catch (error: unknown) {
-    console.error("Error querying the LLM:", (error as Error).message);
-    return NextResponse.json(
-      { error: "Internal server error", details: (error as Error).message },
-      { status: 500 }
-    );
-  }
 }
 
 async function scrapeTopGoogleResults(query: string): Promise<string[]> {
@@ -143,7 +164,7 @@ async function scrapeTopGoogleResults(query: string): Promise<string[]> {
 }
 
 async function parseTopResultsWithCheerio(searchResults: SearchResult[]) {
-  console.log(searchResults);
+  //console.log(searchResults);
   const parsedResults = await Promise.all(
     searchResults.map(async result => {
       const response = await axios.get(result.link);
@@ -163,9 +184,9 @@ async function parseTopResultsWithCheerio(searchResults: SearchResult[]) {
       const combinedContent = [title, ...allParagraphs].join(" ");
       const limitedContent = combinedContent
         .split(/\s+/)
-        .slice(0, 3000)
+        .slice(0, 700)
         .join(" "); // Limit to 100 words
-      console.log("scraped data: ", title);
+      //console.log("scraped data: ", limitedContent);
       return { content: `${title}\n${limitedContent}`, links: result.link };
     })
   );

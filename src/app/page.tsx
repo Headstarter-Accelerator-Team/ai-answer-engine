@@ -11,12 +11,13 @@ type Message = {
 
 function extractUrls(input: string): string[] {
   // Regular expression to match URLs
+
   // const urlRegex = /https?:\/\/(?:www\.)?[a-zA-Z0-9._-]+\.[a-zA-Z]{2,}(?:\/[a-zA-Z0-9._-]*)*/g;
   const urlRegex = /https?:\/\/[^\s/$.?#].[^\s]*/g;
-
+  console.log("message string", input);
   // Use the match method to find all URLs in the string
   const matches = input.match(urlRegex);
-
+  console.log("matches:", matches);
   // Return the matches or an empty array if no URLs were found
   return matches || [];
 }
@@ -58,7 +59,7 @@ export default function Home() {
 
     const urls = extractUrls(message);
 
-    console.log(urls);
+    console.log("urls", urls);
 
     const url_data = urls.length > 0 ? await extract_URL_Content(urls) : [];
 
@@ -73,19 +74,28 @@ export default function Home() {
     try {
       const combinedContent = {
         userMessage: message,
-        urlContent: url_data,
+        urlContent: urls,
       };
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ query: message }),
+        body: JSON.stringify({ query: message, url: urls }),
       });
 
       // TODO: Handle the response from the chat API to display the AI response in the UI
 
       if (!response.ok) {
+        if (response.status === 429) {
+          setMessages(prev => [
+            ...prev,
+            {
+              role: "ai",
+              content: "Request limit exceeded, try again in 10 seconds",
+            },
+          ]);
+        }
         throw new Error(`Response status: ${response.status}`);
       }
 
@@ -105,10 +115,12 @@ export default function Home() {
       setMessage("");
     } catch (error) {
       console.error("Error:", error);
-      setMessages(prev => [
-        ...prev,
-        { role: "ai", content: "Something went wrong. Please try again." },
-      ]);
+      if (response.status != 429) {
+        setMessages(prev => [
+          ...prev,
+          { role: "ai", content: "Something went wrong. Please try again." },
+        ]);
+      }
     } finally {
       setIsLoading(false);
     }
