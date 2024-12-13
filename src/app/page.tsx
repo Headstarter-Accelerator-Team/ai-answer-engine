@@ -3,6 +3,7 @@ import { LampContainer } from "@/components/ui/lamp";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { PlaceholdersAndVanishInput } from "@/components/ui/placeholders-and-vanish-input";
+import { StickyScrollComponent } from "../components//ui/Articles";
 
 type Message = {
   role: "user" | "ai";
@@ -53,61 +54,98 @@ export default function Home() {
     }
   };
 
+  // const handleSend = async () => {
+  //   if (!message.trim()) return;
+
+  //   const urls = extractUrls(message);
+
+  //   console.log(urls);
+
+  //   const url_data = urls.length > 0 ? await extract_URL_Content(urls) : [];
+
+  //   console.log("URL Data: ", url_data);
+
+  //   // Add user message to the conversation
+  //   const userMessage = { role: "user" as const, content: message };
+  //   setMessages(prev => [...prev, userMessage]);
+  //   setMessage("");
+  //   setIsLoading(true);
+
+  //   try {
+  //     const combinedContent = {
+  //       userMessage: message,
+  //       urlContent: url_data,
+  //     };
+  //     const response = await fetch("/api/chat", {
+  //       method: "POST",
+  //       headers: {
+  //         "Content-Type": "application/json",
+  //       },
+  //       body: JSON.stringify({ query: combinedContent }),
+  //     });
+
+  //     // TODO: Handle the response from the chat API to display the AI response in the UI
+
+  //     if (!response.ok) {
+  //       throw new Error(`Response status: ${response.status}`);
+  //     }
+
+  //     const result = await response.json();
+
+  //     console.log(result);
+
+  //     const llm_message =
+  //       typeof result.response === "string"
+  //         ? result.response
+  //         : JSON.stringify(result.response);
+
+  //     const llm_response = { role: "ai" as const, content: llm_message };
+
+  //     setMessages(prev => [...prev, llm_response]);
+  //     setMessage("");
+  //   } catch (error) {
+  //     console.error("Error:", error);
+  //     setMessages(prev => [
+  //       ...prev,
+  //       { role: "ai", content: "Something went wrong. Please try again." },
+  //     ]);
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
+
   const handleSend = async () => {
     if (!message.trim()) return;
 
-    const urls = extractUrls(message);
-
-    console.log(urls);
-
-    const url_data = urls.length > 0 ? await extract_URL_Content(urls) : [];
-
-    console.log("URL Data: ", url_data);
-
-    // Add user message to the conversation
     const userMessage = { role: "user" as const, content: message };
     setMessages(prev => [...prev, userMessage]);
     setMessage("");
     setIsLoading(true);
 
     try {
-      const combinedContent = {
-        userMessage: message,
-        urlContent: url_data,
-      };
       const response = await fetch("/api/chat", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ query: combinedContent }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: message }),
       });
 
-      // TODO: Handle the response from the chat API to display the AI response in the UI
+      const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(`Response status: ${response.status}`);
+      if (data.error) {
+        throw new Error(data.error);
       }
 
-      const result = await response.json();
+      // Add AI response to messages
+      const aiMessage = { role: "ai" as const, content: data.response };
+      setMessages(prev => [...prev, aiMessage]);
 
-      console.log(result);
-
-      const llm_message =
-        typeof result.response === "string"
-          ? result.response
-          : JSON.stringify(result.response);
-
-      const llm_response = { role: "ai" as const, content: llm_message };
-
-      setMessages(prev => [...prev, llm_response]);
-      setMessage("");
+      // Update articles if you have a state for them
+      if (data.articles) {
+        setArticles(data.articles);
+      }
     } catch (error) {
       console.error("Error:", error);
-      setMessages(prev => [
-        ...prev,
-        { role: "ai", content: "Something went wrong. Please try again." },
-      ]);
+      // Handle error (maybe show an error message to user)
     } finally {
       setIsLoading(false);
     }
@@ -116,56 +154,68 @@ export default function Home() {
   // TODO: Modify the color schemes, fonts, and UI as needed for a good user experience
   // Refer to the Tailwind CSS docs here: https://tailwindcss.com/docs/customizing-colors, and here: https://tailwindcss.com/docs/hover-focus-and-other-states
   return (
-    <div className="flex flex-col h-screen bg-gray-900">
+    <div className="h-screen flex flex-col bg-gray-900">
       {/* Header */}
       <div className="w-full bg-gray-800 border-b border-gray-700 p-4">
-        <div className="max-w-3xl mx-auto">
-          <h1 className="text-xl font-semibold text-white">Chat</h1>
-        </div>
+        <h1 className="text-xl font-semibold text-white">Chat</h1>
       </div>
-      {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto pb-32 pt-4">
-        <div className="max-w-3xl mx-auto px-4">
-          {messages.map((msg, index) => (
-            <div
-              key={index}
-              className={`flex gap-4 mb-4 ${
-                msg.role === "ai"
-                  ? "justify-start"
-                  : "justify-end flex-row-reverse"
-              }`}
-            >
+
+      {/* Main Container */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Messages Container */}
+        <div className="w-[60%] flex-1 overflow-y-auto pb-32 pt-4">
+          <div className="max-w-3xl mx-auto px-4">
+            {messages.map((msg, index) => (
               <div
-                className={`px-4 py-2 rounded-2xl max-w-[80%] ${
+                key={index}
+                className={`flex gap-4 mb-4 ${
                   msg.role === "ai"
-                    ? "bg-gray-800 border border-gray-700 text-gray-100"
-                    : "bg-cyan-600 text-white ml-auto"
+                    ? "justify-start"
+                    : "justify-end flex-row-reverse"
                 }`}
               >
-                {msg.content}
-              </div>
-            </div>
-          ))}
-          {isLoading && (
-            <div className="flex gap-4 mb-4">
-              <div className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center">
-                <svg
-                  className="w-5 h-5 text-gray-400"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
+                <div
+                  className={`px-4 py-2 rounded-2xl max-w-[80%] ${
+                    msg.role === "ai"
+                      ? "bg-gray-800 border border-gray-700 text-gray-100"
+                      : "bg-cyan-600 text-white ml-auto"
+                  }`}
                 >
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-4-8c.79 0 1.5-.71 1.5-1.5S8.79 9 8 9s-1.5.71-1.5 1.5S7.21 11 8 11zm8 0c.79 0 1.5-.71 1.5-1.5S16.79 9 16 9s-1.5.71-1.5 1.5.71 1.5 1.5 1.5zm-4 4c2.21 0 4-1.79 4-4h-8c0 2.21 1.79 4 4 4z" />
-                </svg>
-              </div>
-              <div className="px-4 py-2 rounded-2xl bg-gray-800 border border-gray-700 text-gray-100">
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
+                  {msg.content}
                 </div>
               </div>
-            </div>
-          )}
+            ))}
+            {isLoading && (
+              <div className="flex gap-4 mb-4">
+                <div className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center">
+                  <svg
+                    className="w-5 h-5 text-gray-400"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-4-8c.79 0 1.5-.71 1.5-1.5S8.79 9 8 9s-1.5.71-1.5 1.5S7.21 11 8 11zm8 0c.79 0 1.5-.71 1.5-1.5S16.79 9 16 9s-1.5.71-1.5 1.5.71 1.5 1.5 1.5zm-4 4c2.21 0 4-1.79 4-4h-8c0 2.21 1.79 4 4 4z" />
+                  </svg>
+                </div>
+                <div className="px-4 py-2 rounded-2xl bg-gray-800 border border-gray-700 text-gray-100">
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div className="w-[1px] bg-gray-700/20 shadow-[0_0_15px_rgba(0,0,0,0.1)] relative">
+          <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/0 via-cyan-500/10 to-cyan-500/0" />
+        </div>
+
+        {/* Articles Section */}
+        <div className="w-[40%] overflow-y-auto pb-32">
+          <StickyScrollComponent />
         </div>
       </div>
 

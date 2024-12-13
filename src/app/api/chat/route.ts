@@ -1,24 +1,12 @@
-// TODO: Implement the chat API with Groq and web scraping with Cheerio and Puppeteer
-// Refer to the Next.js Docs on how to read the Request body: https://nextjs.org/docs/app/building-your-application/routing/route-handlers
-// Refer to the Groq SDK here on how to use an LLM: https://www.npmjs.com/package/groq-sdk
-// Refer to the Cheerio docs here on how to parse HTML: https://cheerio.js.org/docs/basics/loading
-// Refer to Puppeteer docs here: https://pptr.dev/guides/what-is-puppeteer
-
-//JSON format {query: "exampple of user query, best biotracking wearables"}
-
+// app/api/chat/route.ts
 import { NextRequest, NextResponse } from "next/server";
-// import dotenv from "dotenv";
 import Groq from "groq-sdk";
-import puppeteer from "puppeteer";
 import * as cheerio from "cheerio";
 import axios from "axios";
-
-// dotenv.config();
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const GOOGLE_SEARCH_ENGINE_ID = process.env.GOOGLE_SEARCH_ENGINE_ID;
-// Initialize OpenAI client
 
 interface SearchResult {
   title: string;
@@ -26,9 +14,8 @@ interface SearchResult {
   snippet: string;
 }
 
-const openai = new Groq({
+const groq = new Groq({
   apiKey: GROQ_API_KEY!,
-  baseURL: "https://api.groq.com",
 });
 
 async function getGoogleSearchResults(query: string): Promise<SearchResult[]> {
@@ -42,126 +29,129 @@ async function getGoogleSearchResults(query: string): Promise<SearchResult[]> {
       `Google API error: ${data.error?.message || "Unknown error"}`
     );
   }
-  const limitedItems = data.items.slice(0, 2);
-  //console.log("12423", limitedItems);
-  return limitedItems.map((item: SearchResult) => ({
+
+  const limitedItems = data.items?.slice(0, 2) || [];
+  return limitedItems.map((item: any) => ({
     title: item.title,
     link: item.link,
     snippet: item.snippet,
   }));
 }
 
+async function parseTopResultsWithCheerio(searchResults: SearchResult[]) {
+  const parsedResults = await Promise.all(
+    searchResults.map(async result => {
+      try {
+        const response = await axios.get(result.link);
+        const $ = cheerio.load(response.data);
+
+        const title = $("title").text().trim();
+        const allParagraphs = $("p")
+          .map((i, elem) => $(elem).text().trim())
+          .get()
+          .filter(text => text.length > 0);
+
+        const combinedContent = [title, ...allParagraphs].join(" ");
+        const limitedContent = combinedContent
+          .split(/\s+/)
+          .slice(0, 3000)
+          .join(" ");
+
+        return {
+          title: title,
+          content: limitedContent,
+          url: result.link,
+        };
+      } catch (error) {
+        console.error(`Error parsing ${result.link}:`, error);
+        return {
+          title: result.title,
+          content: result.snippet,
+          url: result.link,
+        };
+      }
+    })
+  );
+
+  return parsedResults;
+}
+
 export async function POST(req: NextRequest) {
   try {
-    // Parse the request body
-    const body = await req.json();
-    const { query } = body;
+    const { message } = await req.json();
 
-    if (!query) {
-      return NextResponse.json({ error: "Query is required" }, { status: 400 });
+    if (!message) {
+      return NextResponse.json(
+        { error: "Message is required" },
+        { status: 400 }
+      );
     }
 
-    // Step 1: Scrape the top 10 Google results
-    const scrapedHTMLPages = await getGoogleSearchResults(query);
+    // Get search results
+    const searchResults = await getGoogleSearchResults(message);
 
-    // Step 2: Parse the content of the results
-    const extractedData = parseTopResultsWithCheerio(scrapedHTMLPages);
+    // Parse the content
+    const parsedContent = await parseTopResultsWithCheerio(searchResults);
 
-    // LLM interaction
-    const systemPrompt = `
-      You are an expert in web content analysis. Use the following data to answer the query:
-      **Task:**
-      1. Analyze the extracted data and provide a comprehensive, informative, and concise response to the query.
-      2. Cite sources within the response using a format like: (Source 1) or (Source 2).
-      3. Avoid plagiarism and ensure the response is original and well-structured.
+    // Format content for LLM
+    const formattedContent = parsedContent
+      .map(
+        (item, index) => `Source ${index + 1} (${item.url}):\n${item.content}`
+      )
+      .join("\n\n");
 
-      **Format:**
-      * **Answer:** 
-      * **Sources Cited:**
-      ${(await extractedData).join("\n\n")}\n\n
-    `;
+    // Prepare prompt for LLM
+    const systemPrompt = `You are a helpful and knowledgeable AI assistant.
 
-    const llmResponse = await openai.chat.completions.create({
-      model: "llama3-8b-8192",
+If a user provides a source/URL analyze it and return relevant information from the provided sources:
+
+ALWAYS FOLLOW THE GUIDELINES IN ** **
+
+**Focus on extracting and synthesizing key information**
+**Maintain a balanced perspective from multiple sources**
+**When no source is available use your general knowledge or retrieve relevant sources to provide an answer**
+**Maintain a professional yet friendly tone*
+**Acknowledge that your information comes from the provided sources**
+**Mention when information might need verification**
+**Include relevant dates or timeframes when available**
+
+Remember: Your goal is to provide helpful, accurate information while being 
+transparent about your sources and limitations.
+
+Current sources available:
+${formattedContent ? `\n${formattedContent}` : "\nNo external sources available for this query."}`;
+
+    // Get LLM response
+    const completion = await groq.chat.completions.create({
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: query },
+        {
+          role: "user",
+          content: `Question: ${message}\n\nSources:\n${formattedContent}`,
+        },
       ],
+      model: "llama-3.3-70b-versatile",
+      temperature: 0.7,
+      max_tokens: 1024,
     });
 
-    const llmAnswer = llmResponse.choices[0]?.message?.content || "No response";
-    console.log(llmAnswer);
+    const response =
+      completion.choices[0]?.message?.content ||
+      "I couldn't generate a response.";
+
     return NextResponse.json({
-      llmAnswer,
+      response,
+      articles: parsedContent.map(item => ({
+        title: item.title,
+        url: item.url,
+        summary: item.content.substring(0, 200) + "...",
+      })),
     });
-  } catch (error: unknown) {
-    console.error("Error querying the LLM:", (error as Error).message);
+  } catch (error) {
+    console.error("Error:", error);
     return NextResponse.json(
       { error: "Internal server error", details: (error as Error).message },
       { status: 500 }
     );
   }
-}
-
-async function scrapeTopGoogleResults(query: string): Promise<string[]> {
-  const browser = await puppeteer.launch({ headless: true });
-  const page = await browser.newPage();
-
-  // Step 1: Navigate to Google with the search query
-  const searchURL = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-  await page.goto(searchURL, { waitUntil: "networkidle2" });
-
-  // Step 2: Extract the top 2 result links
-  const links = await page.evaluate(() => {
-    return Array.from(document.querySelectorAll("a"))
-      .filter(a => a.href.includes("http"))
-      .map(a => a.href)
-      .slice(0, 2); // Limit to top 2 links
-  });
-
-  // Step 3: Visit each link and extract its HTML
-  const results: string[] = [];
-  for (const link of links) {
-    try {
-      const newPage = await browser.newPage();
-      await newPage.goto(link, { waitUntil: "networkidle2" });
-      const html = await newPage.content();
-      results.push(html);
-      await newPage.close();
-    } catch (error) {
-      console.error(`Error scraping ${link}:`, error);
-    }
-  }
-
-  await browser.close();
-  return results;
-}
-
-async function parseTopResultsWithCheerio(searchResults: SearchResult[]) {
-  console.log(searchResults);
-  const parsedResults = await Promise.all(
-    searchResults.map(async result => {
-      const response = await axios.get(result.link);
-      const $ = cheerio.load(response.data);
-
-      // Extract relevant data from each page
-      //console.log("link: ", result.link);
-      const title = $("title").text();
-      //const description = $("meta[name='description']").attr("content") || "";
-      const allParagraphs = $("p")
-        .map((i, elem) => $(elem).text())
-        .get();
-
-      // Combine paragraphs and limit by word count
-      const combinedContent = [title, ...allParagraphs].join(" ");
-      const limitedContent = combinedContent
-        .split(/\s+/)
-        .slice(0, 3000)
-        .join(" "); // Limit to 100 words
-      console.log("scraped data: ", title);
-      return `${title}\n${limitedContent}`;
-    })
-  );
-
-  return parsedResults;
 }
