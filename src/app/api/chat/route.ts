@@ -55,14 +55,15 @@ export async function POST(req: NextRequest) {
   try {
     // Parse the request body
     const body = await req.json();
-    const { query } = body;
+    console.log("", body);
+    const { message } = body;
 
-    if (!query) {
+    if (!message) {
       return NextResponse.json({ error: "Query is required" }, { status: 400 });
     }
 
     // Step 1: Scrape the top 10 Google results
-    const scrapedHTMLPages = await getGoogleSearchResults(query);
+    const scrapedHTMLPages = await getGoogleSearchResults(message);
 
     // Step 2: Parse the content of the results
     const extractedData = parseTopResultsWithCheerio(scrapedHTMLPages);
@@ -85,16 +86,14 @@ export async function POST(req: NextRequest) {
       model: "llama-3.1-8b-instant",
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: query },
+        { role: "user", content: message },
       ],
     });
 
     const llmAnswer = llmResponse.choices[0]?.message?.content || "No response";
     // console.log(query, scrapedHTMLPages, llmAnswer);
     return NextResponse.json({
-      query,
-      extractedData,
-      llmResponse: llmAnswer,
+      llmAnswer,
     });
   } catch (error: unknown) {
     console.error("Error querying the LLM:", (error as Error).message);
