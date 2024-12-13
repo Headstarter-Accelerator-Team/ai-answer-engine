@@ -7,13 +7,13 @@
 //JSON format {query: "exampple of user query, best biotracking wearables"}
 
 import { NextRequest, NextResponse } from "next/server";
-import dotenv from "dotenv";
+// import dotenv from "dotenv";
 import Groq from "groq-sdk";
 import puppeteer from "puppeteer";
 import * as cheerio from "cheerio";
 import axios from "axios";
 
-dotenv.config();
+// dotenv.config();
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
