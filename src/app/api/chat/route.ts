@@ -65,8 +65,10 @@ export async function POST(req: NextRequest) {
     const scrapedHTMLPages = await getGoogleSearchResults(query);
 
     // Step 2: Parse the content of the results
-    const extractedData = parseTopResultsWithCheerio(scrapedHTMLPages);
+    const extractedData = await parseTopResultsWithCheerio(scrapedHTMLPages);
 
+    const allLinks = extractedData.flatMap(result => result.links);
+    const data = extractedData.flatMap(result => result.content);
     // LLM interaction
     const systemPrompt = `
       You are an expert in web content analysis. Use the following data to answer the query:
@@ -78,7 +80,7 @@ export async function POST(req: NextRequest) {
       **Format:**
       * **Answer:** 
       * **Sources Cited:**
-      ${(await extractedData).join("\n\n")}\n\n
+      ${(await data).join("\n\n")}\n\n
     `;
 
     const llmResponse = await openai.chat.completions.create({
@@ -91,8 +93,11 @@ export async function POST(req: NextRequest) {
 
     const llmAnswer = llmResponse.choices[0]?.message?.content || "No response";
     console.log(llmAnswer);
+
+    // Return both the LLM answer and the extracted links
     return NextResponse.json({
-      llmAnswer,
+      response: llmAnswer,
+      links: allLinks, // Include the links in the response
     });
   } catch (error: unknown) {
     console.error("Error querying the LLM:", (error as Error).message);
@@ -152,6 +157,8 @@ async function parseTopResultsWithCheerio(searchResults: SearchResult[]) {
         .map((i, elem) => $(elem).text())
         .get();
 
+      // Extract all links from the page
+
       // Combine paragraphs and limit by word count
       const combinedContent = [title, ...allParagraphs].join(" ");
       const limitedContent = combinedContent
@@ -159,7 +166,7 @@ async function parseTopResultsWithCheerio(searchResults: SearchResult[]) {
         .slice(0, 3000)
         .join(" "); // Limit to 100 words
       console.log("scraped data: ", title);
-      return `${title}\n${limitedContent}`;
+      return { content: `${title}\n${limitedContent}`, links: result.link };
     })
   );
 

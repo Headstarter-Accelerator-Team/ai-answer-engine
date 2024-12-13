@@ -1,26 +1,24 @@
-
 "use client";
 import { LampContainer } from "@/components/ui/lamp";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { PlaceholdersAndVanishInput } from "@/components/ui/placeholders-and-vanish-input";
-
+import Dropdown from "@/components/dropdown";
 type Message = {
   role: "user" | "ai";
   content: string;
 };
 
-
 function extractUrls(input: string): string[] {
-    // Regular expression to match URLs
-    // const urlRegex = /https?:\/\/(?:www\.)?[a-zA-Z0-9._-]+\.[a-zA-Z]{2,}(?:\/[a-zA-Z0-9._-]*)*/g;
-    const urlRegex = /https?:\/\/[^\s/$.?#].[^\s]*/g;
+  // Regular expression to match URLs
+  // const urlRegex = /https?:\/\/(?:www\.)?[a-zA-Z0-9._-]+\.[a-zA-Z]{2,}(?:\/[a-zA-Z0-9._-]*)*/g;
+  const urlRegex = /https?:\/\/[^\s/$.?#].[^\s]*/g;
 
-    // Use the match method to find all URLs in the string
-    const matches = input.match(urlRegex);
+  // Use the match method to find all URLs in the string
+  const matches = input.match(urlRegex);
 
-    // Return the matches or an empty array if no URLs were found
-    return matches || [];
+  // Return the matches or an empty array if no URLs were found
+  return matches || [];
 }
 
 export default function Home() {
@@ -32,13 +30,13 @@ export default function Home() {
 
   const extract_URL_Content = async (urls: string[]) => {
     try {
-      const response = await fetch('/api/scrape', {
-        method: 'POST',
+      const response = await fetch("/api/scrape", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({ URLs: urls}),
-      })
+        body: JSON.stringify({ URLs: urls }),
+      });
       if (!response.ok) {
         console.error("Error");
         return [];
@@ -58,12 +56,11 @@ export default function Home() {
   const handleSend = async () => {
     if (!message.trim()) return;
 
-
     const urls = extractUrls(message);
 
     console.log(urls);
 
-    const url_data = (urls.length > 0) ? await extract_URL_Content(urls) : [];
+    const url_data = urls.length > 0 ? await extract_URL_Content(urls) : [];
 
     console.log("URL Data: ", url_data);
 
@@ -74,59 +71,64 @@ export default function Home() {
     setIsLoading(true);
 
     try {
-
       const combinedContent = {
         userMessage: message,
         urlContent: url_data,
-      }
+      };
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ query: combinedContent }),
+        body: JSON.stringify({ query: message }),
       });
 
       // TODO: Handle the response from the chat API to display the AI response in the UI
 
-      if (!response.ok){
+      if (!response.ok) {
         throw new Error(`Response status: ${response.status}`);
       }
 
       const result = await response.json();
 
-      console.log(result);
+      console.log("Ashan", result);
 
-      const llm_message = typeof result.response === "string" 
-      ? result.response 
-      : JSON.stringify(result.response);
+      const llm_message =
+        typeof result.response === "string"
+          ? result.response
+          : JSON.stringify(result.response);
 
-      const llm_response = { role: "ai" as const, content: llm_message};
-
+      console.log("LLM Response:", llm_message);
+      const llm_response = { role: "ai" as const, content: llm_message };
+      console.log("LLM Response:", llm_response);
       setMessages(prev => [...prev, llm_response]);
       setMessage("");
-
     } catch (error) {
       console.error("Error:", error);
       setMessages(prev => [
         ...prev,
         { role: "ai", content: "Something went wrong. Please try again." },
       ]);
-
     } finally {
       setIsLoading(false);
     }
   };
-
 
   // TODO: Modify the color schemes, fonts, and UI as needed for a good user experience
   // Refer to the Tailwind CSS docs here: https://tailwindcss.com/docs/customizing-colors, and here: https://tailwindcss.com/docs/hover-focus-and-other-states
   return (
     <div className="flex flex-col h-screen bg-gray-900">
       {/* Header */}
+
       <div className="w-full bg-gray-800 border-b border-gray-700 p-4">
         <div className="max-w-3xl mx-auto">
           <h1 className="text-xl font-semibold text-white">Chat</h1>
+          <Dropdown
+            options={[
+              { value: "Google Search Model", label: "multimodal" },
+              { value: "Pupetter Model", label: "text" },
+            ]}
+          />
         </div>
       </div>
       {/* Messages Container */}
@@ -187,8 +189,8 @@ export default function Home() {
               placeholder="Type your message..."
               className="flex-1 rounded-xl border border-gray-700 bg-gray-900 px-4 py-3 text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent placeholder-gray-400"
             /> */}
-            <PlaceholdersAndVanishInput 
-              placeholders={['Type your message...']}
+            <PlaceholdersAndVanishInput
+              placeholders={["Type your message..."]}
               onChange={e => setMessage(e.target.value)}
               onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
                 e.preventDefault();
