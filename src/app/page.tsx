@@ -1,11 +1,27 @@
-"use client";
 
+"use client";
+import { LampContainer } from "@/components/ui/lamp";
 import { useState } from "react";
+import { motion } from "framer-motion";
+import { PlaceholdersAndVanishInput } from "@/components/ui/placeholders-and-vanish-input";
 
 type Message = {
   role: "user" | "ai";
   content: string;
 };
+
+
+function extractUrls(input: string): string[] {
+    // Regular expression to match URLs
+    // const urlRegex = /https?:\/\/(?:www\.)?[a-zA-Z0-9._-]+\.[a-zA-Z]{2,}(?:\/[a-zA-Z0-9._-]*)*/g;
+    const urlRegex = /https?:\/\/[^\s/$.?#].[^\s]*/g;
+
+    // Use the match method to find all URLs in the string
+    const matches = input.match(urlRegex);
+
+    // Return the matches or an empty array if no URLs were found
+    return matches || [];
+}
 
 export default function Home() {
   const [message, setMessage] = useState("");
@@ -14,8 +30,42 @@ export default function Home() {
   ]);
   const [isLoading, setIsLoading] = useState(false);
 
+  const extract_URL_Content = async (urls: string[]) => {
+    try {
+      const response = await fetch('/api/scrape', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ URLs: urls}),
+      })
+      if (!response.ok) {
+        console.error("Error");
+        return [];
+      }
+
+      const result = await response.json();
+      console.log("Result: ", result);
+
+      console.log("Structured Data: ", result.content);
+      return result.content;
+    } catch (error) {
+      console.error("Error: ", error);
+      return [];
+    }
+  };
+
   const handleSend = async () => {
     if (!message.trim()) return;
+
+
+    const urls = extractUrls(message);
+
+    console.log(urls);
+
+    const url_data = (urls.length > 0) ? await extract_URL_Content(urls) : [];
+
+    console.log("URL Data: ", url_data);
 
     // Add user message to the conversation
     const userMessage = { role: "user" as const, content: message };
@@ -24,21 +74,45 @@ export default function Home() {
     setIsLoading(true);
 
     try {
+
+      const combinedContent = {
+        userMessage: message,
+        urlContent: url_data,
+      }
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ query: combinedContent }),
       });
 
       // TODO: Handle the response from the chat API to display the AI response in the UI
 
+      if (!response.ok){
+        throw new Error(`Response status: ${response.status}`);
+      }
 
+      const result = await response.json();
 
+      console.log(result);
+
+      const llm_message = typeof result.response === "string" 
+      ? result.response 
+      : JSON.stringify(result.response);
+
+      const llm_response = { role: "ai" as const, content: llm_message};
+
+      setMessages(prev => [...prev, llm_response]);
+      setMessage("");
 
     } catch (error) {
       console.error("Error:", error);
+      setMessages(prev => [
+        ...prev,
+        { role: "ai", content: "Something went wrong. Please try again." },
+      ]);
+
     } finally {
       setIsLoading(false);
     }
@@ -55,7 +129,6 @@ export default function Home() {
           <h1 className="text-xl font-semibold text-white">Chat</h1>
         </div>
       </div>
-
       {/* Messages Container */}
       <div className="flex-1 overflow-y-auto pb-32 pt-4">
         <div className="max-w-3xl mx-auto px-4">
@@ -106,21 +179,29 @@ export default function Home() {
       <div className="fixed bottom-0 w-full bg-gray-800 border-t border-gray-700 p-4">
         <div className="max-w-3xl mx-auto">
           <div className="flex gap-3 items-center">
-            <input
+            {/* <input
               type="text"
               value={message}
               onChange={e => setMessage(e.target.value)}
               onKeyPress={e => e.key === "Enter" && handleSend()}
               placeholder="Type your message..."
               className="flex-1 rounded-xl border border-gray-700 bg-gray-900 px-4 py-3 text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent placeholder-gray-400"
+            /> */}
+            <PlaceholdersAndVanishInput 
+              placeholders={['Type your message...']}
+              onChange={e => setMessage(e.target.value)}
+              onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
+                e.preventDefault();
+                handleSend();
+              }}
             />
-            <button
+            {/* <button
               onClick={handleSend}
               disabled={isLoading}
               className="bg-cyan-600 text-white px-5 py-3 rounded-xl hover:bg-cyan-700 transition-all disabled:bg-cyan-800 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? "Sending..." : "Send"}
-            </button>
+            </button> */}
           </div>
         </div>
       </div>

@@ -4,8 +4,6 @@
 // Refer to the Cheerio docs here on how to parse HTML: https://cheerio.js.org/docs/basics/loading
 // Refer to Puppeteer docs here: https://pptr.dev/guides/what-is-puppeteer
 
-//JSON format {query: "exampple of user query, best biotracking wearables"}
-
 import { NextRequest, NextResponse } from "next/server";
 import dotenv from "dotenv";
 import Groq from "groq-sdk";

@@ -10,16 +10,29 @@
     "format:fix": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md}\""
   },
   "dependencies": {
+<<<<<<< HEAD
     "axios": "^1.7.9",
     "cheerio": "^1.0.0",
     "dotenv": "^16.4.7",
+=======
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "framer-motion": "^11.13.5",
+>>>>>>> d081378d02d85d0e573e664773612e2a71d2d1e7
     "groq-sdk": "^0.9.0",
+    "lucide-react": "^0.468.0",
     "next": "15.0.4",
     "openai": "^4.76.1",
     "prettier": "^3.4.2",
+<<<<<<< HEAD
     "puppeteer": "^23.10.3",
+=======
+    "puppeteer-core": "^23.10.4",
+>>>>>>> d081378d02d85d0e573e664773612e2a71d2d1e7
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "tailwind-merge": "^2.5.5",
+    "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
     "@types/node": "^20",
