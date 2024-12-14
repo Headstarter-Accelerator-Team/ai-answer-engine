@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { PlaceholdersAndVanishInput } from "@/components/ui/placeholders-and-vanish-input";
 import Dropdown from "@/components/dropdown";
 import puppeteer from "puppeteer-core";
+import { StickyScrollComponent } from "../components/ui/Articles";
 type Message = {
   role: "user" | "ai";
   content: string;
@@ -29,7 +30,19 @@ export default function Home() {
     { role: "ai", content: "Hello! How can I help you today?" },
   ]);
   const [isLoading, setIsLoading] = useState(false);
-  const [articlesLinks, setArticlesLinks] = useState<string[]>([]);
+  const [articleData, setArticleData] = useState<{
+    links: string[];
+    titles: string[];
+    summaries: string[];
+    headings: string[];
+    authors: string[];
+  }>({
+    links: [],
+    titles: [],
+    summaries: [],
+    headings: [],
+    authors: [],
+  });
 
   const extract_URL_Content = async (urls: string[]) => {
     try {
@@ -79,7 +92,11 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ query: message, url: urls, puppeteer_data: url_data }),
+        body: JSON.stringify({
+          query: message,
+          url: urls,
+          puppeteer_data: url_data,
+        }),
       });
 
       // TODO: Handle the response from the chat API to display the AI response in the UI
@@ -90,15 +107,15 @@ export default function Home() {
 
       const result = await response.json();
 
-      console.log("Ashan", result);
-
-      console.log("test", result.links);
-
       if (result.links) {
-        setArticlesLinks(result.links);
+        setArticleData(prevData => ({
+          links: [...prevData.links, ...result.links],
+          titles: [...prevData.titles, ...result.titles],
+          summaries: [...prevData.summaries, ...result.summaries],
+          headings: [...prevData.headings, ...result.headings],
+          authors: [...prevData.authors, ...result.authors],
+        }));
       }
-
-      console.log("articlelinks array", articlesLinks);
 
       const llm_message =
         typeof result.response === "string"
@@ -195,7 +212,7 @@ export default function Home() {
 
         {/* Articles Section */}
         <div className="w-[40%] overflow-y-auto pb-32">
-          <StickyScrollComponent articleLinks={articlesLinks} />
+          <StickyScrollComponent articleData={articleData} />
         </div>
       </div>
 

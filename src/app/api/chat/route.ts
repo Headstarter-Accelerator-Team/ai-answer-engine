@@ -39,7 +39,6 @@ interface PuppeteerDataEntry {
   content: PuppeteerContent;
 }
 
-
 const openai = new Groq({
   apiKey: GROQ_API_KEY!,
   baseURL: "https://api.groq.com",
@@ -49,8 +48,9 @@ export async function POST(req: NextRequest) {
   try {
     // Parse the request body
     const body = await req.json();
+    console.log(body);
     const { query, url, puppeteer_data } = body;
-    console.log(query, url, puppeteer_data);
+    console.log(query, url);
     if (!query) {
       return NextResponse.json({ error: "Query is required" }, { status: 400 });
     }
@@ -72,8 +72,10 @@ export async function POST(req: NextRequest) {
       (await parseTopResultsWithCheerio(scrapedHTMLPages)) || [];
 
     const allLinks = extractedData.flatMap(result => result.links);
-    const allTitles = scrapedHTMLPages.flatMap(result => result.title);
-    const allSnippets = scrapedHTMLPages.flatMap(result => result.snippet);
+    //const allTitles = scrapedHTMLPages.flatMap(result => result.title);
+    //const allSnippets = scrapedHTMLPages.flatMap(result => result.snippet);
+    const allTitles = extractedData.flatMap(result => result.title);
+    const allSnippets = extractedData.flatMap(result => result.snippet);
     const allHeadings = extractedData.flatMap(result => result.heading);
     const allAuthors = extractedData.flatMap(result => result.author);
     const completeData = extractedData.flatMap(result => result.content);
@@ -81,9 +83,8 @@ export async function POST(req: NextRequest) {
       result.split(/\s+/).slice(0, 20000).join(" ")
     );
 
-
-
-    const puppeteerContent = puppeteer_data
+    //pupeteer code for combining
+    const puppeteerContent = (puppeteer_data || [])
       .flatMap((entry: PuppeteerDataEntry) => {
         const { url, content } = entry;
 
@@ -115,14 +116,16 @@ export async function POST(req: NextRequest) {
 
     // LLM interaction
     const systemPrompt = `
-    You are an academic expert who provides responses strictly based on the given context. Your answers should be well-structured, concise, and informative.
+      YOu are an academic expert where you base your responses only on the context you have been provided.
+      **Task:**
+      1. Analyze the extracted data and provide a comprehensive, informative, and concise response to the query.
+      2. Cite sources within the response using a format like: (Source 1) or (Source 2).
+      3. Avoid plagiarism and ensure the response is original and well-structured.
 
-    **Task:**
-    1. Carefully review the context provided below, which includes information extracted from Google Search results and web scraping.
-    2. Respond to the user's query comprehensively, ensuring accuracy and relevance.
-    3. When citing information, use the following format: (source: [link]). For scraped content, provide the link to the original URL as the source.
-
-    **Context to Analyze:**
+      **Format:**
+      * **Answer:** 
+      * **Sources Cited:**
+      **Context to Analyze:**
     ${context}
 
     **Guidelines:**
@@ -131,10 +134,7 @@ export async function POST(req: NextRequest) {
     - Maintain a neutral and academic tone.
     - Do not include information outside the given context.
     `;
-
-
-    console.log(systemPrompt);
-
+    // console.log(systemPrompt);
     const messages: ChatMessage[] = [
       {
         role: "system",
@@ -161,12 +161,11 @@ export async function POST(req: NextRequest) {
       authors: allAuthors,
     });
     // Return both the LLM answer and the extracted links
-    console.log(allLinks);
     return NextResponse.json({
       response: llmAnswer,
       links: allLinks, // Include the links in the response
       titles: allTitles,
-      summarries: allSnippets,
+      summaries: allSnippets,
       headings: allHeadings,
       authors: allAuthors,
     });
@@ -209,6 +208,7 @@ async function parseTopResultsWithCheerio(searchResults: SearchResult[]) {
       // Extract relevant data from each page
       //console.log("link: ", result.link);
       const title = $("title").text();
+      const summary = $("meta[name='description']").attr("content") || ""; // Extract summary from meta description
       const author =
         $("meta[name='author']").attr("content") ||
         $("span.author").text() ||
@@ -233,6 +233,8 @@ async function parseTopResultsWithCheerio(searchResults: SearchResult[]) {
         links: result.link,
         author: author,
         heading: topHeading,
+        snippet: summary,
+        title: title,
       };
     })
   );
