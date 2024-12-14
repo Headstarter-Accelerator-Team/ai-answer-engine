@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import dotenv from "dotenv";
 import Groq from "groq-sdk";
 import * as cheerio from "cheerio";
-import axios, { all } from "axios";
+import axios from "axios";
 
 dotenv.config();
 
@@ -28,6 +28,17 @@ interface SearchResult {
   snippet: string;
 }
 
+interface PuppeteerContent {
+  title: string;
+  headings: { heading: string; tag: string }[];
+  paragraphs: string[];
+}
+
+interface PuppeteerDataEntry {
+  url: string;
+  content: PuppeteerContent;
+}
+
 const openai = new Groq({
   apiKey: GROQ_API_KEY!,
   baseURL: "https://api.groq.com",
@@ -38,7 +49,7 @@ export async function POST(req: NextRequest) {
     // Parse the request body
     const body = await req.json();
     console.log(body);
-    const { query, url } = body;
+    const { query, url, puppeteer_data } = body;
     console.log(query, url);
     if (!query) {
       return NextResponse.json({ error: "Query is required" }, { status: 400 });
@@ -56,7 +67,9 @@ export async function POST(req: NextRequest) {
       scrapedHTMLPages = await getGoogleSearchResults(query);
     }
     // Step 2: Parse the content of the results
-    const extractedData = await parseTopResultsWithCheerio(scrapedHTMLPages);
+
+    const extractedData =
+      (await parseTopResultsWithCheerio(scrapedHTMLPages)) || [];
 
     const allLinks = extractedData.flatMap(result => result.links);
     const allTitles = scrapedHTMLPages.flatMap(result => result.title);
@@ -65,8 +78,40 @@ export async function POST(req: NextRequest) {
     const allAuthors = extractedData.flatMap(result => result.author);
     const completeData = extractedData.flatMap(result => result.content);
     const data = completeData.flatMap(result =>
-      result.split(/\s+/).slice(0, 2500).join(" ")
+      result.split(/\s+/).slice(0, 20000).join(" ")
     );
+
+    //pupeteer code for combining
+    const puppeteerContent = (puppeteer_data || [])
+      .flatMap((entry: PuppeteerDataEntry) => {
+        const { url, content } = entry;
+
+        if (!content) {
+          return []; // Skip this entry if content is null or undefined
+        }
+
+        const title = content.title ? `Title: ${content.title}` : "";
+        const headings = content.headings
+          .map(heading => `${heading.tag}: ${heading.heading}`)
+          .join("\n");
+        const paragraphs = content.paragraphs.join(" ");
+
+        return [`Source: ${url}\n\n${title}\n\n${headings}\n\n${paragraphs}`];
+      })
+      .slice(0, 2500) // Truncate to 2500 words
+      .join(" ");
+
+    // Combine all data sources into the LLM context
+    const context = `
+    **Extracted Data from Google Search Results:**
+    These results represent information gathered from performing a Google Search based on the query provided by the user. The content includes titles, snippets, and relevant insights extracted from the top-ranking web pages:
+    ${data}
+
+    **Content Scraped from User-Provided URLs:**
+    Below is detailed content gathered directly from the provided URLs. This includes titles, headings, and key paragraphs to ensure a rich and informative response:
+    ${puppeteerContent}
+    `;
+
     // LLM interaction
     const systemPrompt = `
       YOu are an academic expert where you base your responses only on the context you have been provided.
@@ -78,8 +123,16 @@ export async function POST(req: NextRequest) {
       **Format:**
       * **Answer:** 
       * **Sources Cited:**
-      ${(await data).join("\n\n")}\n\n
+      **Context to Analyze:**
+    ${context}
+
+    **Guidelines:**
+    - Always cite sources when referencing specific content. For content extracted from Google Search results, the source link is typically provided. For scraped content, use the original URL as the citation.
+    - If information is insufficient, indicate this explicitly and suggest alternative ways to gather the required data.
+    - Maintain a neutral and academic tone.
+    - Do not include information outside the given context.
     `;
+    // console.log(systemPrompt);
     const messages: ChatMessage[] = [
       {
         role: "system",
@@ -90,7 +143,7 @@ export async function POST(req: NextRequest) {
         content: query + data,
       }, // Updated to access content
     ];
-    //console.log("message", messages);
+    // console.log("message", messages);
     const llmResponse = await openai.chat.completions.create({
       model: "llama3-8b-8192",
       messages: messages,
@@ -134,7 +187,7 @@ async function getGoogleSearchResults(query: string): Promise<SearchResult[]> {
       `Google API error: ${data.error?.message || "Unknown error"}`
     );
   }
-  const limitedItems = data.items.slice(0, 2);
+  const limitedItems = data.items.slice(0, 5);
   console.log("12423", limitedItems);
   return limitedItems.map((item: SearchResult) => ({
     title: item.title,
