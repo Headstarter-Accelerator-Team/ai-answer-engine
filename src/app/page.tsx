@@ -4,7 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { PlaceholdersAndVanishInput } from "@/components/ui/placeholders-and-vanish-input";
 import Dropdown from "@/components/dropdown";
-import { StickyScrollComponent } from "../components//ui/Articles";
+import puppeteer from "puppeteer-core";
 type Message = {
   role: "user" | "ai";
   content: string;
@@ -79,7 +79,7 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ query: message, url: urls }),
+        body: JSON.stringify({ query: message, url: urls, puppeteer_data: url_data }),
       });
 
       // TODO: Handle the response from the chat API to display the AI response in the UI

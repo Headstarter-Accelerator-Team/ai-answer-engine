@@ -39,6 +39,7 @@ interface PuppeteerDataEntry {
   content: PuppeteerContent;
 }
 
+
 const openai = new Groq({
   apiKey: GROQ_API_KEY!,
   baseURL: "https://api.groq.com",
@@ -48,9 +49,8 @@ export async function POST(req: NextRequest) {
   try {
     // Parse the request body
     const body = await req.json();
-    console.log(body);
     const { query, url, puppeteer_data } = body;
-    console.log(query, url);
+    console.log(query, url, puppeteer_data);
     if (!query) {
       return NextResponse.json({ error: "Query is required" }, { status: 400 });
     }
@@ -81,8 +81,9 @@ export async function POST(req: NextRequest) {
       result.split(/\s+/).slice(0, 20000).join(" ")
     );
 
-    //pupeteer code for combining
-    const puppeteerContent = (puppeteer_data || [])
+
+
+    const puppeteerContent = puppeteer_data
       .flatMap((entry: PuppeteerDataEntry) => {
         const { url, content } = entry;
 
@@ -114,16 +115,14 @@ export async function POST(req: NextRequest) {
 
     // LLM interaction
     const systemPrompt = `
-      YOu are an academic expert where you base your responses only on the context you have been provided.
-      **Task:**
-      1. Analyze the extracted data and provide a comprehensive, informative, and concise response to the query.
-      2. Cite sources within the response using a format like: (Source 1) or (Source 2).
-      3. Avoid plagiarism and ensure the response is original and well-structured.
+    You are an academic expert who provides responses strictly based on the given context. Your answers should be well-structured, concise, and informative.
 
-      **Format:**
-      * **Answer:** 
-      * **Sources Cited:**
-      **Context to Analyze:**
+    **Task:**
+    1. Carefully review the context provided below, which includes information extracted from Google Search results and web scraping.
+    2. Respond to the user's query comprehensively, ensuring accuracy and relevance.
+    3. When citing information, use the following format: (source: [link]). For scraped content, provide the link to the original URL as the source.
+
+    **Context to Analyze:**
     ${context}
 
     **Guidelines:**
@@ -132,7 +131,10 @@ export async function POST(req: NextRequest) {
     - Maintain a neutral and academic tone.
     - Do not include information outside the given context.
     `;
-    // console.log(systemPrompt);
+
+
+    console.log(systemPrompt);
+
     const messages: ChatMessage[] = [
       {
         role: "system",
