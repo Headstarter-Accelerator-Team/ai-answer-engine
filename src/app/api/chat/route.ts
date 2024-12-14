@@ -95,6 +95,7 @@ export async function POST(req: NextRequest) {
     //console.log(llmResponse);
 
     // Return both the LLM answer and the extracted links
+    console.log(allLinks);
     return NextResponse.json({
       response: llmAnswer,
       links: allLinks, // Include the links in the response
