@@ -156,7 +156,7 @@ export async function POST(req: NextRequest) {
     console.log({
       links: allLinks,
       titles: allTitles,
-      summaries: allSnippets, // Fixed typo: "summarries" to "summaries"
+      summaries: allSnippets, // Fixed typo: "summaries" to "summaries"
       headings: allHeadings,
       authors: allAuthors,
     });
