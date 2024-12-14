@@ -1,4 +1,3 @@
-// app/api/chat/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import Groq from "groq-sdk";
 import * as cheerio from "cheerio";
