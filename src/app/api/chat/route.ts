@@ -98,7 +98,13 @@ export async function POST(req: NextRequest) {
 
     const llmAnswer = llmResponse.choices[0]?.message?.content || "No response";
     //console.log(llmResponse);
-
+    console.log({
+      links: allLinks,
+      titles: allTitles,
+      summaries: allSnippets, // Fixed typo: "summarries" to "summaries"
+      headings: allHeadings,
+      authors: allAuthors,
+    });
     // Return both the LLM answer and the extracted links
     return NextResponse.json({
       response: llmAnswer,
@@ -151,7 +157,7 @@ async function parseTopResultsWithCheerio(searchResults: SearchResult[]) {
         $("meta[name='author']").attr("content") ||
         $("span.author").text() ||
         "Unknown Author";
-      const topHeading = $("h1").first().text() || "No heading found";
+      const topHeading = $("h1").first().text() || title;
       //const description = $("meta[name='description']").attr("content") || "";
       const allParagraphs = $("p")
         .map((i, elem) => $(elem).text())
