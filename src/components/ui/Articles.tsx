@@ -17,7 +17,6 @@ interface StickyScrollComponentProps {
 export const StickyScrollComponent: React.FC<StickyScrollComponentProps> = ({
   articleData,
 }) => {
-  // Add safety check at the beginning
   if (!articleData || !articleData.links || articleData.links.length === 0) {
     return (
       <div className="h-full flex items-center justify-center text-gray-400">
@@ -26,7 +25,6 @@ export const StickyScrollComponent: React.FC<StickyScrollComponentProps> = ({
     );
   }
 
-  // Ensure all arrays exist with safe fallbacks
   const links = articleData.links || [];
   const titles = articleData.titles || [];
   const summaries = articleData.summaries || [];
