@@ -163,7 +163,7 @@ export async function POST(req: NextRequest) {
       response: llmAnswer,
       links: allLinks, // Include the links in the response
       titles: allTitles,
-      summarries: allSnippets,
+      summaries: allSnippets,
       headings: allHeadings,
       authors: allAuthors,
     });
