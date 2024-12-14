@@ -28,6 +28,18 @@ interface SearchResult {
   snippet: string;
 }
 
+interface PuppeteerContent {
+  title: string;
+  headings: { heading: string; tag: string }[];
+  paragraphs: string[];
+}
+
+interface PuppeteerDataEntry {
+  url: string;
+  content: PuppeteerContent;
+}
+
+
 const openai = new Groq({
   apiKey: GROQ_API_KEY!,
   baseURL: "https://api.groq.com",
@@ -37,8 +49,8 @@ export async function POST(req: NextRequest) {
   try {
     // Parse the request body
     const body = await req.json();
-    const { query, url } = body;
-    console.log(query, url);
+    const { query, url, puppeteer_data } = body;
+    console.log(query, url, puppeteer_data);
     if (!query) {
       return NextResponse.json({ error: "Query is required" }, { status: 400 });
     }
@@ -62,19 +74,61 @@ export async function POST(req: NextRequest) {
     const data = completeData.flatMap(result =>
       result.split(/\s+/).slice(0, 2500).join(" ")
     );
+
+
+
+    const puppeteerContent = puppeteer_data
+      .flatMap((entry: PuppeteerDataEntry) => {
+        const { url, content } = entry;
+
+        if (!content) {
+          return []; // Skip this entry if content is null or undefined
+        }
+
+        const title = content.title ? `Title: ${content.title}` : "";
+        const headings = content.headings
+          .map(heading => `${heading.tag}: ${heading.heading}`)
+          .join("\n");
+        const paragraphs = content.paragraphs.join(" ");
+
+        return [`Source: ${url}\n\n${title}\n\n${headings}\n\n${paragraphs}`];
+      })
+      .slice(0, 2500) // Truncate to 2500 words
+      .join(" ");
+
+    // Combine all data sources into the LLM context
+    const context = `
+    **Extracted Data from Google Search Results:**
+    These results represent information gathered from performing a Google Search based on the query provided by the user. The content includes titles, snippets, and relevant insights extracted from the top-ranking web pages:
+    ${data}
+
+    **Content Scraped from User-Provided URLs:**
+    Below is detailed content gathered directly from the provided URLs. This includes titles, headings, and key paragraphs to ensure a rich and informative response:
+    ${puppeteerContent}
+    `;
+
     // LLM interaction
     const systemPrompt = `
-      YOu are an academic expert where you base your responses only on the context you have been provided.
-      **Task:**
-      1. Analyze the extracted data and provide a comprehensive, informative, and concise response to the query.
-      2. Cite sources within the response using a format like: (Source 1) or (Source 2).
-      3. Avoid plagiarism and ensure the response is original and well-structured.
+    You are an academic expert who provides responses strictly based on the given context. Your answers should be well-structured, concise, and informative.
 
-      **Format:**
-      * **Answer:** 
-      * **Sources Cited:**
-      ${(await data).join("\n\n")}\n\n
+    **Task:**
+    1. Carefully review the context provided below, which includes information extracted from Google Search results and web scraping.
+    2. Respond to the user's query comprehensively, ensuring accuracy and relevance.
+    3. When citing information, use the following format: (source: [link]). For scraped content, provide the link to the original URL as the source.
+
+    **Context to Analyze:**
+    ${context}
+
+    **Guidelines:**
+    - Always cite sources when referencing specific content. For content extracted from Google Search results, the source link is typically provided. For scraped content, use the original URL as the citation.
+    - If information is insufficient, indicate this explicitly and suggest alternative ways to gather the required data.
+    - Maintain a neutral and academic tone.
+    - Do not include information outside the given context.
     `;
+
+
+    console.log(systemPrompt);
+
     const messages: ChatMessage[] = [
       {
         role: "system",
