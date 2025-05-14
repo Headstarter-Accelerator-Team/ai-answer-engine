@@ -1,10 +1,10 @@
 "use client";
-import { LampContainer } from "@/components/ui/lamp";
+//import { LampContainer } from "@/components/ui/lamp";
 import { useState } from "react";
-import { motion } from "framer-motion";
+//import { motion } from "framer-motion";
 import { PlaceholdersAndVanishInput } from "@/components/ui/placeholders-and-vanish-input";
-import Dropdown from "@/components/dropdown";
-import puppeteer from "puppeteer-core";
+//import Dropdown from "@/components/dropdown";
+//import puppeteer from "puppeteer-core";
 import { StickyScrollComponent } from "../components/ui/Articles";
 type Message = {
   role: "user" | "ai";

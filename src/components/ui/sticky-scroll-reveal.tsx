@@ -36,7 +36,7 @@ const LoadingSkeleton = () => (
 
 export const StickyScroll = ({
   content,
-  contentClassName,
+  //contentClassName,
   isLoading = false, // Add loading prop
 }: {
   content: {
@@ -46,13 +46,13 @@ export const StickyScroll = ({
     date?: string;
     readTime?: string;
     url?: string;
-    content?: React.ReactNode | any;
+    content?: React.ReactNode | string;
   }[];
   contentClassName?: string;
   isLoading?: boolean;
 }) => {
   const [activeCard, setActiveCard] = React.useState(0);
-  const ref = useRef<any>(null);
+  const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: ref,
     container: ref,

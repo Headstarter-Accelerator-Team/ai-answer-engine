@@ -19,7 +19,7 @@ const rateLimit = new Ratelimit({
 export async function middleware(request: NextRequest) {
   try {
     const { success, limit, reset, remaining } = await rateLimit.limit("user");
-
+    console.log("request - ", request);
     console.log(
       `Rate limit status: success=${success}, remaining=${remaining}`
     );

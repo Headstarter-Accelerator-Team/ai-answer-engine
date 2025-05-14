@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import type { NextApiRequest, NextApiResponse } from "next";
 
-const sharedDataStore = new Map<string, any>(); // Temporary in-memory store
+const sharedDataStore = new Map<string, unknown>(); // Temporary in-memory store
 
 export default async function handler(
   req: NextApiRequest,

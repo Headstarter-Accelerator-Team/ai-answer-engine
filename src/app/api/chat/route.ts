@@ -83,6 +83,8 @@ export async function POST(req: NextRequest) {
       result.split(/\s+/).slice(0, 20000).join(" ")
     );
 
+    console.log("extracted data from cheerio: ");
+
     //pupeteer code for combining
     const puppeteerContent = (puppeteer_data || [])
       .flatMap((entry: PuppeteerDataEntry) => {
@@ -147,7 +149,7 @@ export async function POST(req: NextRequest) {
     ];
     // console.log("message", messages);
     const llmResponse = await openai.chat.completions.create({
-      model: "llama3-8b-8192",
+      model: "llama-3.3-70b-versatile",
       messages: messages,
     });
 
@@ -170,7 +172,7 @@ export async function POST(req: NextRequest) {
       authors: allAuthors,
     });
   } catch (error: unknown) {
-    console.error("Error querying the LLM:", (error as Error).message);
+    console.error("Error:", (error as Error).message);
     return NextResponse.json(
       { error: "Internal server error", details: (error as Error).message },
       { status: 500 }
